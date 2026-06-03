@@ -3,15 +3,30 @@ import requests, os, subprocess
 version = ""
 ext = ""
 
+class Operator:
+    order:list[Operator] = []
+    def __init__(self, name:str, location:tuple[int, int], seperator:str = ""):
+        self.name = name
+        self.location = location
+        self.seperator = seperator
+        Operator.order.append(self)
+    
+    def __repr__(self):
+        return f"Operator({self.name})"
+
 
 class Repos:
     repos:list[str] = []
+    definitions:list[str] = []
 
     @classmethod
-    def add(cls, repository_location):
-
+    def add(cls, repository_location:str):
         cls.repos.append(repository_location)
+        cls.definitions.append(None)
 
+    @classmethod
+    def define(cls, definition, repository_index:int=-1):
+        cls.definitions[repository_index] = definition
 
 class Locations:
     libraries = ["libcache"]
@@ -36,7 +51,80 @@ class Tasks:
         # response = requests.get(f"{repo}/{module}/{version}{ext}")
 
 
-        print("0. requested libraries:", Libraries.lib)
+        # print("0. requested libraries:", Libraries.lib)
+        for lib in Libraries.lib:
+            if ":" not in lib:
+                version = "latest"
+            else:
+                lib, version = lib.split(":")
+            print(lib)
+            print(version)
+            location = ""
+            for repo in Repos.repos:
+                try:
+                    response = requests.get(f"{repo}/repo.pjb")
+                except requests.exceptions.ConnectionError as e:
+                    print(f"could not connect to {repo}")
+                    continue
+
+                if response.status_code != 200:
+                    print(f"error getting repo from {repo}")
+                    continue
+
+                for line in response.content.decode("utf-8").split("\n"):
+                    if line.startswith("#"):
+                        continue
+                    if ".pjb" in line and lib == line[:-4]:
+                        try:
+                            response = requests.get(f"{repo}/{line}")
+                        except requests.exceptions.ConnectionError as e:
+                            print(f"could not connect to {repo}")
+                            continue
+
+                        for line in response.content.decode("utf-8").split("\n"):
+                            start:list[str] = []
+                            end:list[str] = []
+                            for index in range(len(line)):
+                                match line[index]:
+                                    case "{":
+                                        start.append(index)
+                                match line[index]:
+                                    case "}":
+                                        end.append(index)
+                            if len(start) != len(end):
+                                raise (ValueError(f"line \"{line}\" is not formatted properly"))
+
+                            name = None
+                            primary = None
+                            secondary = None
+                            tertiary = None
+                            ext = None
+                            meta = None
+                            
+                            for i in range(len(start)):
+                                if line[start[i]:end[i]] in ["{name", "{primary", "{secondary", "{tertiary", "{ext", "{meta"]:
+                                        #put the name and location then it cuts from the end of this
+                                        # operator to the start of the next one and sets that as the seperator
+                                        try:
+                                            name = Operator(line[start[i]+1:end[i]], tuple([start[i], end[i]]), line[end[i]+1:][:line[end[i]+1:].index("{")])
+                                        except ValueError as e:
+                                            if "substring not found" in str(e):
+                                                name = Operator(line[start[i]+1:end[i]], tuple([start[i], end[i]]))
+                                            else:
+                                                raise ValueError(e)
+                                    # case _:
+                                    #     if line[start[i]+1:end[i]] == "":
+                                    #         print(ValueError(f"There is an empty operator at {start[i]}"))
+                                    #     else:
+                                    #         print(ValueError(f"There is an unkown operator at {start[i]}: \"{line[start[i]+1:end[i]]}\""))
+                                
+
+                            for op in Operator.order:
+                                print(f"{op.name}{op.seperator}", end="")
+                            print()
+
+
+                            
 
 
         # for i in Repos.repos:

@@ -24,8 +24,9 @@ import os, subprocess
 Repos.add("http://localhost:400")
 Repos.add("http://localhost:401")
 Repos.add("http://localhost:402")
+Repos.add("http://localhost:403")
 
-Libraries.add("Lib")
+Libraries.add("Lib:latest")
 
 
 
